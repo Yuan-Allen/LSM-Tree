@@ -1,10 +1,14 @@
 #pragma once
 
 #include "kvstore_api.h"
+#include "skiplist.h"
+#include <iostream>
 
-class KVStore : public KVStoreAPI {
+class KVStore : public KVStoreAPI
+{
 	// You can add your implementation here
 private:
+	Skiplist *memTable;
 
 public:
 	KVStore(const std::string &dir);
@@ -18,5 +22,4 @@ public:
 	bool del(uint64_t key) override;
 
 	void reset() override;
-
 };
