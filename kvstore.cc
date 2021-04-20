@@ -24,7 +24,13 @@ void KVStore::put(uint64_t key, const std::string &s)
  */
 std::string KVStore::get(uint64_t key)
 {
-	return memTable->getValue(key);
+	std::string result;
+	result = memTable->getValue(key);
+	if (result == "~DELETED~")
+	{
+		return "";
+	}
+	return result;
 }
 /**
  * Delete the given key-value pair if it exists.
@@ -32,7 +38,20 @@ std::string KVStore::get(uint64_t key)
  */
 bool KVStore::del(uint64_t key)
 {
-	return memTable->remove(key);
+	bool flag = false;
+	std::string value;
+	value = memTable->getValue(key);
+	if (value == "~DELETED~")
+	{
+		return false;
+	}
+	if (value != "")
+	{
+		memTable->remove(key);
+		put(key, "~DELETED~");
+		return true;
+	}
+	return flag;
 }
 
 /**

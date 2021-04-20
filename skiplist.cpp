@@ -96,7 +96,7 @@ bool Skiplist::remove(uint64_t key)
             p->right = tmp->right;
             delete tmp;
             flag = true;
-            if (p == head && p->right == nullptr)
+            if (p == head && p->right == nullptr) //最高层为空，删除该层
             {
                 tmp = head;
                 head = head->down;

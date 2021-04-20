@@ -30,6 +30,7 @@ public:
     Node *findNode(uint64_t key);
     bool remove(uint64_t key);
     void clear();
+    int size();
 };
 
 #endif
