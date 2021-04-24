@@ -14,7 +14,7 @@ struct Node
     string val;
     Node *right, *down;
     Node(uint64_t key, string val, Node *right = nullptr, Node *down = nullptr) : key(key), val(val), right(right), down(down) {}
-    Node() : right(nullptr), down(nullptr) {}
+    Node() : key(0), val(""), right(nullptr), down(nullptr) {}
 };
 
 class Skiplist
@@ -30,7 +30,12 @@ public:
     Node *findNode(uint64_t key);
     bool remove(uint64_t key);
     void clear();
-    int size();
+    uint64_t size(); //返回键值对数量
+    int dataSize();  //返回value累计大小
+    uint64_t getMaxKey();
+    uint64_t getMinKey();
+    vector<bool> genBFVector();
+    Node *getLowestHead(); //返回最底层的head
 };
 
 #endif

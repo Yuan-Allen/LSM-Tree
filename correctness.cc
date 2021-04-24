@@ -4,7 +4,8 @@
 
 #include "test.h"
 
-class CorrectnessTest : public Test {
+class CorrectnessTest : public Test
+{
 private:
 	const uint64_t SIMPLE_TEST_MAX = 512;
 	const uint64_t LARGE_TEST_MAX = 1024 * 64;
@@ -24,24 +25,25 @@ private:
 		phase();
 
 		// Test multiple key-value pairs
-		for (i = 0; i < max; ++i) {
-			store.put(i, std::string(i+1, 's'));
-			EXPECT(std::string(i+1, 's'), store.get(i));
+		for (i = 0; i < max; ++i)
+		{
+			store.put(i, std::string(i + 1, 's'));
+			EXPECT(std::string(i + 1, 's'), store.get(i));
 		}
 		phase();
 
 		// Test after all insertions
 		for (i = 0; i < max; ++i)
-			EXPECT(std::string(i+1, 's'), store.get(i));
+			EXPECT(std::string(i + 1, 's'), store.get(i));
 		phase();
 
 		// Test deletions
-		for (i = 0; i < max; i+=2)
+		for (i = 0; i < max; i += 2)
 			EXPECT(true, store.del(i));
 
 		for (i = 0; i < max; ++i)
-			EXPECT((i & 1) ? std::string(i+1, 's') : not_found,
-			       store.get(i));
+			EXPECT((i & 1) ? std::string(i + 1, 's') : not_found,
+				   store.get(i));
 
 		for (i = 1; i < max; ++i)
 			EXPECT(i & 1, store.del(i));
@@ -52,7 +54,7 @@ private:
 	}
 
 public:
-	CorrectnessTest(const std::string &dir, bool v=true) : Test(dir, v)
+	CorrectnessTest(const std::string &dir, bool v = true) : Test(dir, v)
 	{
 	}
 
@@ -74,7 +76,7 @@ int main(int argc, char *argv[])
 
 	std::cout << "Usage: " << argv[0] << " [-v]" << std::endl;
 	std::cout << "  -v: print extra info for failed tests [currently ";
-	std::cout << (verbose ? "ON" : "OFF")<< "]" << std::endl;
+	std::cout << (verbose ? "ON" : "OFF") << "]" << std::endl;
 	std::cout << std::endl;
 	std::cout.flush();
 
