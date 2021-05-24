@@ -6,6 +6,7 @@ Index::Index()
 
 Index::~Index()
 {
+    clear();
 }
 
 SSTable *Index::readFile(int l, int i, std::fstream *in)
@@ -52,7 +53,24 @@ SSTable *Index::readFile(int l, int i, std::fstream *in)
 SSTable *Index::addToIndex(int l, int i, uint64_t time, std::vector<bool> BF, std::vector<IndexNode> ind)
 {
     SSTable *tmp = new SSTable(l, i, time, BF, ind);
-    index.push_back(tmp);
+    while (l > (int)(index.size() - 1))
+    {
+        index.push_back(std::vector<SSTable *>());
+    }
+    //index[l].push_back(tmp);
+    bool flag = false;
+    for (std::vector<SSTable *>::iterator it = index[l].begin(); it != index[l].end(); it++)
+    {
+        if ((*it)->getId() > i)
+        {
+            index[l].insert(it, tmp);
+            flag = true;
+            break;
+        }
+    }
+    if (!flag)
+        index[l].push_back(tmp);
+
     return tmp;
 }
 
@@ -60,16 +78,23 @@ SSTable *Index::search(uint64_t key, uint32_t &offset)
 {
     SSTable *result = nullptr;
     uint32_t tmpOffset;
+    bool flag = false;
     for (size_t i = 0; i < index.size(); i++)
     {
-        if ((tmpOffset = index[i]->hasKey(key)) > 0)
+        for (size_t j = 0; j < index[i].size(); j++)
         {
-            if ((!result) || (result && (index[i]->getTimeStamp() > result->getTimeStamp()))) //选时间戳最大的
+            if ((tmpOffset = index[i][j]->hasKey(key)) > 0)
             {
-                result = index[i];
-                offset = tmpOffset;
+                if ((!result) || (result && (index[i][j]->getTimeStamp() > result->getTimeStamp()))) //选时间戳最大的
+                {
+                    result = index[i][j];
+                    offset = tmpOffset;
+                    flag = true;
+                }
             }
         }
+        if (flag)
+            break;
     }
     return result;
 }
@@ -78,6 +103,55 @@ void Index::clear()
 {
     for (size_t i = 0; i < index.size(); i++)
     {
-        delete index[i];
+        for (size_t j = 0; j < index[i].size(); j++)
+        {
+            delete index[i][j];
+        }
+        index[i].clear();
+    }
+    index.clear();
+}
+
+void Index::deleteFileIndex(int level, int i)
+{
+    for (std::vector<SSTable *>::iterator it = index[level].begin(); it != index[level].end(); it++)
+    {
+        if ((*it)->getId() == i)
+        {
+            index[level].erase(it);
+            break;
+        }
+    }
+}
+
+std::vector<int> Index::findIntersectionId(int level, uint64_t minKey, uint64_t maxKey)
+{
+    std::vector<int> result;
+    for (std::vector<SSTable *>::iterator it = index[level].begin(); it != index[level].end(); it++)
+    {
+        if (!((*it)->getMaxKey() < minKey || (*it)->getMinKey() > maxKey))
+        {
+            result.push_back((*it)->getId());
+            index[level].erase(it);
+            it--;
+        }
+    }
+    int size = index[level].size();
+    for (int i = 0; i < size; ++i)
+    {
+        index[level][i]->changeId(i);
+    }
+    return result;
+}
+
+void Index::changeIndex(int level, int oldId, int id)
+{
+    for (std::vector<SSTable *>::iterator it = index[level].begin(); it != index[level].end(); ++it)
+    {
+        if ((*it)->getId() == oldId)
+        {
+            (*it)->changeId(id);
+            break;
+        }
     }
 }

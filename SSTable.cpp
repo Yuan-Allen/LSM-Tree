@@ -65,3 +65,18 @@ int SSTable::getId()
 {
     return id;
 }
+
+uint64_t SSTable::getMinKey()
+{
+    return index.front().key;
+}
+
+uint64_t SSTable::getMaxKey()
+{
+    return index.back().key;
+}
+
+void SSTable::changeId(int newId)
+{
+    id = newId;
+}

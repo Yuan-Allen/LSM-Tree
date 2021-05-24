@@ -32,6 +32,9 @@ public:
     uint64_t getTimeStamp();
     int getLevel();
     int getId();
+    uint64_t getMinKey();
+    uint64_t getMaxKey();
+    void changeId(int newId); //改变id
 };
 
 #endif

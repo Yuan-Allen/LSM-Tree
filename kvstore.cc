@@ -5,6 +5,7 @@ KVStore::KVStore(const std::string &dir) : KVStoreAPI(dir)
 	root = dir;
 	memTable = new Skiplist();
 	index = new Index();
+	buffer = new Buffer();
 	maxTimeStamp = 0;
 	initialize();
 }
@@ -14,6 +15,7 @@ KVStore::~KVStore()
 	saveToDisk();
 	delete memTable;
 	delete index;
+	delete buffer;
 }
 
 void KVStore::initialize()
@@ -31,6 +33,7 @@ void KVStore::initialize()
 			if (!in->is_open())
 			{
 				in->close();
+				delete in;
 				break;
 			}
 			levelFilesNum[level]++;
@@ -41,6 +44,7 @@ void KVStore::initialize()
 			}
 			i += 1;
 			in->close();
+			delete in;
 		}
 	}
 }
@@ -54,6 +58,8 @@ void KVStore::put(uint64_t key, const std::string &s)
 	if (memTableSize() + 8 + 4 + s.size() > 2 * 1024 * 1024) //如果插入后的大小大于2M，先把memTable写入SSTable(8和4分别是key和offset的大小)
 	{
 		saveToDisk();
+		if (levelFilesNum[0] >= 3)
+			compact(0);
 	}
 	memTable->insert(key, s);
 }
@@ -173,7 +179,7 @@ void KVStore::saveToDisk()
 	}
 
 	//写入索引区
-	uint32_t offset = 32 + 10240 + memTable->size() * (8 + 4);
+	uint32_t offset = 32 + 10240 + size * (8 + 4);
 	Node *p = memTable->getLowestHead();
 	p = p->right;
 	while (p)
@@ -244,5 +250,101 @@ std::string KVStore::findInSSTable(uint64_t key)
 	result = buf;
 	if (result == "~DELETED~")
 		return "";
+	return result;
+}
+
+void KVStore::compact(int level)
+{
+	buffer->clear();
+	string SSTablePath;
+	int limit = 0;
+	if (level == 0)
+		limit = 0; //若是第0层，从第0个SSTable开始合并
+	else
+		limit = 1 << (level + 1);
+	int oldLevelFilesNum = levelFilesNum[level];
+	//把该层要合并的SSTable读入buffer，并删除文件
+	for (int i = limit; i < oldLevelFilesNum; i++)
+	{
+		SSTablePath = getSSTablePath(level, i);
+		fstream *in = new fstream(SSTablePath.c_str(), ios::binary | ios::in);
+		buffer->readFile(in);
+		in->close();
+		delete in;
+		utils::rmfile(SSTablePath.c_str());
+		index->deleteFileIndex(level, i);
+		levelFilesNum[level]--;
+	}
+
+	int nextLevel = level + 1;
+	vector<int> interSSTable;			   //下一层键值有交集的SSTable的id
+	if (levelFilesNum.size() == nextLevel) //下一层为空
+	{
+		buffer->compact(true);	  //合并时需要删除~DELETED~
+		generateLevel(nextLevel); //创建下一层文件夹
+	}
+	else
+	{
+		oldLevelFilesNum = levelFilesNum[nextLevel];
+		int minKey = buffer->getMinKey();
+		int maxKey = buffer->getMaxKey();
+		interSSTable = index->findIntersectionId(nextLevel, minKey, maxKey);
+		for (size_t i = 0; i < interSSTable.size(); i++) //把下层需要合并的读进去，并删除文件
+		{
+			SSTablePath = getSSTablePath(nextLevel, interSSTable[i]);
+			fstream *in = new fstream(SSTablePath.c_str(), ios::binary | ios::in);
+			buffer->readFile(in);
+			in->close();
+			delete in;
+			utils::rmfile(SSTablePath.c_str());
+			levelFilesNum[nextLevel]--;
+		}
+		for (int i = 0, k = 0; i < oldLevelFilesNum; i++) //重命名下层文件名
+		{
+			if (SSTableFileExists(nextLevel, i))
+			{
+				rename(getSSTablePath(nextLevel, i).c_str(), getSSTablePath(nextLevel, k).c_str());
+				++k;
+			}
+		}
+		buffer->compact(false);
+	}
+	while (!buffer->isOutputEmpty())
+	{
+		if (SSTableFileExists(nextLevel, 0)) //在开头插入，已有的文件名依次往后挪一个
+		{
+			for (int i = levelFilesNum[nextLevel] - 1; i >= 0; --i)
+			{
+				rename(getSSTablePath(nextLevel, i).c_str(), getSSTablePath(nextLevel, i + 1).c_str());
+				index->changeIndex(nextLevel, i, i + 1);
+			}
+		}
+		SSTablePath = getSSTablePath(nextLevel, 0);
+		levelFilesNum[nextLevel]++;
+		fstream *out = new fstream(SSTablePath.c_str(), ios::binary | ios::out);
+		buffer->write(out);
+		out->close();
+		delete out;
+		//读进index
+		fstream *in = new fstream(SSTablePath.c_str(), ios::binary | ios::in);
+		index->readFile(nextLevel, 0, in);
+		in->close();
+		delete in;
+	}
+	if (levelFilesNum[nextLevel] > (1 << (nextLevel + 1)))
+		compact(nextLevel);
+}
+
+bool KVStore::SSTableFileExists(int level, int id)
+{
+	bool result = true;
+	string SSTablePath = getSSTablePath(level, id);
+	fstream *in = new fstream(SSTablePath.c_str(), ios::binary | ios::in);
+	if (!in->is_open())
+	{
+		result = false;
+	}
+	in->close();
+	delete in;
 	return result;
 }
